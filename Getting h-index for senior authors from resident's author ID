@@ -1,0 +1,80 @@
+import pandas as pd
+import requests
+import time
+import math
+
+#list degree
+
+resident_list = [['Michael Martini',57191261342], ['Mahmoud Elguindy',55710789400],['Ricardo Najera',57223206695],['Hunter Boudreau',57211576577],['John Bernabei',56648113900],['Austin Anthony',57609587500],['Gabriel Arguelles',57210557097]]
+
+def get_scopus_publications(author_id, start=0):
+    #each paper should be a 4-tuple as follows: (paper uri, paper title, journal name, date)
+    params = {'start':str(start)}
+    headers = {'Accept': 'application/json', 'X-ELS-APIKey':'d991a06120f48ecf77667063bc1ee0f3'}
+    base_url = f'http://api.elsevier.com/content/search/scopus?query=au-id%28{author_id}%29'
+    response = requests.get(base_url,headers=headers, params=params)
+
+    if response.status_code == 200:
+        data = response.json()['search-results']
+        paper_list = [(data['entry'][i]['link'][0]['@href'], data['entry'][i]['dc:title'], data['entry'][i]['prism:publicationName'], data['entry'][i]['prism:coverDate']) for i in range(len(data['entry']))]
+        total_pubs = int(data['opensearch:totalResults'])
+        pages = math.ceil(total_pubs / int(data['opensearch:itemsPerPage']))
+        next_start = int(data['opensearch:startIndex'])+int(data['opensearch:itemsPerPage'])
+        return (paper_list, total_pubs, next_start)
+    else:
+        print(response.status_code)
+
+def get_last_author_of_abstract(uri):
+    
+#   uri = uri + '?view=Full'
+#   subjects = [i['$'] for i in response['abstracts-retrieval-response']['subject-areas']['subject-area']]
+    uri = uri + '?view=META_ABS'
+    headers = {'Accept': 'application/json', 'X-ELS-APIKey':'d991a06120f48ecf77667063bc1ee0f3'}
+    response = requests.get(uri,headers=headers)
+    print(response.json())
+    asfgh
+    if response.status_code == 200:
+        data = response.json()['abstracts-retrieval-response']['authors']['author'][-1]
+        last_author_uri = data['author-url'] 
+        return last_author_uri
+    else:
+        print(response.status_code)
+    
+def get_author_deets_from_uri(uri):
+    uri = uri + '?view=ENHANCED'
+    headers = {'Accept': 'application/json', 'X-ELS-APIKey':'d991a06120f48ecf77667063bc1ee0f3'}
+    response = requests.get(uri,headers=headers)
+    
+    if response.status_code == 200:
+        data = response.json()['author-retrieval-response'][0]
+        h_index = data['h-index']
+        name = data['author-profile']['preferred-name']['given-name'] + ' ' + data['author-profile']['preferred-name']['surname']
+        if type(data['author-profile']['affiliation-current']['affiliation']) == list:
+            affil = data['author-profile']['affiliation-current']['affiliation'][0]['ip-doc']['afdispname']
+        else:
+            affil = data['author-profile']['affiliation-current']['affiliation']['ip-doc']['afdispname']
+        return (name, affil, int(h_index))
+    else:
+        print(response.status_code)
+
+final_list = []
+for resident in resident_list:
+    (name, scopus_id) = resident
+    print(name)
+    (paper_list, total_pubs, next_start) = get_scopus_publications(scopus_id)
+    time.sleep(0.05)
+
+    while next_start < total_pubs:
+        (new_papers, total_pubs, next_start) = get_scopus_publications(scopus_id, next_start)
+        paper_list = paper_list + new_papers
+        time.sleep(0.05)
+
+    #each paper is a 4-tuple as follows: (paper uri, paper title, journal name, date)
+    for paper in paper_list:
+        last_author_uri = get_last_author_of_abstract(paper[0])
+        time.sleep(0.05)
+        (last_author, affil, h_index) = get_author_deets_from_uri(last_author_uri)
+        
+        final_list.append([name, scopus_id, total_pubs, paper[1], paper[2], paper[3], last_author, affil, h_index])
+
+pd.DataFrame(final_list).to_excel('h-index run 3.xlsx')

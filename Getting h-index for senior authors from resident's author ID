@@ -9,42 +9,41 @@ from statistics import mean
 
 
 #------------------------ Parameters ------------------------------------------------------------------------------------------------
-
+# Enter your Scopus API key
+your_api_key = None
 
 # Put the name of the excel file and sheet containing resident names and scopus IDs here.
 # Either save this .py file to the same folder as your excel file, or enter the entire file path as the name.
-# For example:     data_file = '/Users/harrisbolus/Desktop/Research/H-index project/redo people 110223.xlsx'
+# For example:     data_file = '/Users/harrisbolus/Desktop/Research/H-index project/residents.xlsx'
 # Make sure resident names are in column 1 and scopus IDs are in column 2.
-data_file = 'redo people 110223.xlsx'
-data_sheet = 'Sheet1'
-
-# Your API key
-api_key = 'your api key'
+data_file = '.../.../... .xlsx'
+data_sheet = '...'
 
 # What do you want to name the output file?
-output_file_name = 'h-index redo data HB 110223.xlsx'
+output_file_name = '.../.../... .xlsx'
 
-# Do you want a subject-specific breakdown? If so, change subject_specific to True, name the subject, and provide a term list.
-subject_specific = True
-subject = 'neuro'
-term_list = {'neuro','spine','brain','nerv','crani','spinal'}
+# Do you want a subject-specific breakdown? If so, set subject_specific to True and provide terms as a dictionary mapping strings to sets of strings.
+# You'll get a breakdown for each key in the dictionary.
+# ex: term_list = {'subject1': {'term1', 'term2'}, 'subject2': {'term3', 'term4', 'term5'}}
+subject_specific = False
+term_list = None
 
 # What year are these residents?
-pgy = 2
+pgy = 0
 
 #When was the most recent interview cycle?
 latest_cycle = datetime.strptime('2023-07-01', '%Y-%m-%d')
 
-
 #-------------------------------------------------------------------------------------------------------------------------------------
+
 
 
 def scopus_search_author_id(author_id, start=0):
     time.sleep(0.02)
 
-    #each paper should be a dict with the following keys: {'abs_uri', 'paper_title', 'journal_name', 'date', 'senior_author', 'senior_author_uri'}
+    #each paper should be a dict with the following keys: {'abstract_uri', 'paper_title', 'journal_name', 'date', 'senior_author', 'senior_author_uri'}
     params = {'start':str(start)}
-    headers = {'Accept': 'application/json', 'X-ELS-APIKey':api_key}
+    headers = {'Accept': 'application/json', 'X-ELS-APIKey':your_api_key}
     base_url = f'http://api.elsevier.com/content/search/scopus?query=au-id%28{author_id}%29&view=COMPLETE'
     response = requests.get(base_url,headers=headers, params=params)
     # print(response.headers)
@@ -55,7 +54,7 @@ def scopus_search_author_id(author_id, start=0):
         paper_list = []
         for i in data['entry']:
             tempdict = {
-            'abs_uri': i['link'][0]['@href'],
+            'abstract_uri': i['link'][0]['@href'],
             'paper_title' : i['dc:title'],
             'journal_name' : i['prism:publicationName'],
             'date' : datetime.strptime(i['prism:coverDate'], '%Y-%m-%d'),
@@ -78,7 +77,7 @@ def scopus_search_author_id(author_id, start=0):
 def author_retrieval_from_scopus_id(scopus_id):
     time.sleep(0.02)
     uri = f'https://api.elsevier.com/content/author/author_id/{scopus_id}?view=ENHANCED'
-    headers = {'Accept': 'application/json', 'X-ELS-APIKey':api_key}
+    headers = {'Accept': 'application/json', 'X-ELS-APIKey':your_api_key}
     response = requests.get(uri,headers=headers)
 
     if response.status_code == 200:
@@ -91,7 +90,7 @@ def author_retrieval_from_scopus_id(scopus_id):
 def abstract_retrieval_from_uri(uri):
     time.sleep(0.02)
     uri = uri + '?view=FULL'
-    headers = {'Accept': 'application/json', 'X-ELS-APIKey':api_key}
+    headers = {'Accept': 'application/json', 'X-ELS-APIKey':your_api_key}
     response = requests.get(uri,headers=headers)
 
     if response.status_code == 200:
@@ -104,7 +103,7 @@ def abstract_retrieval_from_uri(uri):
 def author_retrieval_from_uri(uri):
     time.sleep(0.02)
     uri = uri + '?view=ENHANCED'
-    headers = {'Accept': 'application/json', 'X-ELS-APIKey':api_key}
+    headers = {'Accept': 'application/json', 'X-ELS-APIKey':your_api_key}
     response = requests.get(uri,headers=headers)
 
     if response.status_code == 200:
@@ -121,7 +120,7 @@ def author_retrieval_from_uri(uri):
     else:
         print(response.status_code, '\n', response.text)
 
-def find_backdated_h_index_from_papers(paper_list, pgy):
+def find_backdated_h_index_from_papers(paper_list, pgy):     #consider adding number of pubs in this period
     interview_end_date = latest_cycle-relativedelta(years=pgy)
 
     pre_residency_citation_list = [paper['citations'] for paper in paper_list if paper['date'] < interview_end_date]
@@ -152,13 +151,12 @@ def subject_test(paper):
                 return True
     return False
 
-
-#---------------------------------------------------------------------------------------------------------------------------------------
-
-
 startTime = datetime.now()
 
 resident_list = [{'resident name': resident[0], 'scopus id': resident[1]} for resident in pd.read_excel(data_file, sheet_name=data_sheet).values]
+
+if subject_specific:
+    subjects = list(term_list.keys())
 
 data_list = []
 summary_list = []
@@ -172,15 +170,16 @@ for resident in resident_list:
         paper_list = paper_list + new_papers
 
     for paper in paper_list:
-        paper['subjects'] = abstract_retrieval_from_uri(paper['abs_uri'])
+        paper['subjects'] = abstract_retrieval_from_uri(paper['abstract_uri'])
         (paper['sr_author_affil'], paper['sr_author_h_index']) = author_retrieval_from_uri(paper['senior_author_uri'])
         if subject_specific:
-            paper[subject] = subject_test(paper)
+            for subject in subjects:
+                paper[subject] = subject_test(paper)
         paper.update(resident)
 
         data_list.append(paper)
-        # each paper is now a dictionary with the following keys:
-        # {'abs_uri', 'paper_title', 'journal_name', 'date', 'senior_author', 'senior_author_uri', 'citations', 'subjects',
+        # each paper is a dictionary with the following keys:
+        # {'abstract_uri', 'paper_title', 'journal_name', 'date', 'senior_author', 'senior_author_uri', 'citations', 'subjects',
         # 'affil', 'sr_author_h_index', 'resident name', 'scopus id', 'pgy', 'resident h index', 'total_pubs', optionally subject classification}
 
     sr_author_h_indices = [paper['sr_author_h_index'] for paper in paper_list]
@@ -192,19 +191,22 @@ for resident in resident_list:
     resident['avg_h_index'] = mean(unique_sr_author_h_indices)
 
     if subject_specific:
-        subject_paper_list = [paper for paper in paper_list if paper[subject]]
-        subject_sr_author_h_indices = [paper['sr_author_h_index'] for paper in subject_paper_list]
-        unique_subject_sr_author_h_indices = [j[1] for j in set([(i['senior_author_uri'], i['sr_author_h_index']) for i  in paper_list])]
-        resident[f'total {subject} citations'] = sum([paper['citations'] for paper in subject_paper_list])
-        (resident[f'{subject}_pre_residency_h_index'], resident[f'{subject} pre residency citations']) = find_backdated_h_index_from_papers(subject_paper_list, pgy)
-        resident[f'{subject}_max_h_index'] = max(subject_sr_author_h_indices)
-        resident[f'{subject}_weighted_avg_h_index'] = mean(subject_sr_author_h_indices)
-        resident[f'{subject}_avg_h_index'] = mean(unique_subject_sr_author_h_indices)
+        for subject in subjects:
+            subject_paper_list = [paper for paper in paper_list if paper[subject]]
+            subject_sr_author_h_indices = [paper['sr_author_h_index'] for paper in subject_paper_list]
+            unique_subject_sr_author_h_indices = [j[1] for j in set([(i['senior_author_uri'], i['sr_author_h_index']) for i  in paper_list])]
+            resident[f'total {subject} citations'] = sum([paper['citations'] for paper in subject_paper_list])
+            (resident[f'{subject}_pre_residency_h_index'], resident[f'{subject} pre residency citations']) = find_backdated_h_index_from_papers(subject_paper_list, pgy)
+            resident[f'{subject}_max_h_index'] = max(subject_sr_author_h_indices)
+            resident[f'{subject}_weighted_avg_h_index'] = mean(subject_sr_author_h_indices)
+            resident[f'{subject}_avg_h_index'] = mean(unique_subject_sr_author_h_indices)
 
     summary_list.append(resident)
 
 with pd.ExcelWriter(output_file_name) as writer:
     pd.DataFrame(data_list).to_excel(writer, sheet_name = 'data')
     pd.DataFrame(summary_list).to_excel(writer, sheet_name='summary statistics')
+
+#add cited by count to author_retrieval_from_scopus_id and abstract_retrieval_from_uri, first should give total for author, second should give the number for each paper
 
 print(datetime.now() - startTime)

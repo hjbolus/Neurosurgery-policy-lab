@@ -29,7 +29,7 @@ subject_specific = False
 term_list = None
 
 # What year are these residents?
-pgy = 0
+pgy = 1
 
 #When was the most recent interview cycle?
 latest_cycle = datetime.strptime('2023-07-01', '%Y-%m-%d')

@@ -3,9 +3,9 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 import pandas as pd
 
 #sentiment analysis
-xl = pd.read_excel('/Users/harrisbolus/PycharmProjects/pythonProject/healthgrades really last comments 021424.xlsx')
+xl = pd.read_excel('/.../... .xlsx')
 
-output_file_name = '/Users/harrisbolus/PycharmProjects/pythonProject/healthgrades webscraping sentiments really last batch.xlsx'
+output_file_name = '/.../... .xlsx'
 comments = list(xl['text'])
 
 sia = SentimentIntensityAnalyzer()

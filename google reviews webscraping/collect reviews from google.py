@@ -3,11 +3,11 @@ import time
 from datetime import datetime
 from serpapi import GoogleSearch
 
-api_key = '8fd3a577941d975558efa2891dc14209a997c75a37f73bee5b7c57295ca75538'
+api_key = '...'
 
-df = pd.read_excel('/Users/harrisbolus/PycharmProjects/pythonProject/....xlsx')
+df = pd.read_excel('/.../... .xlsx')
 
-output_file_name = '...'
+output_file_name = '/.../... .xlsx'
 
 #-------------functions-------------------
 
@@ -88,6 +88,6 @@ for row in df:
 
         [reviews.append(i) for i in temp_reviews]
 
-pd.DataFrame(reviews).to_excel(f'/Users/harrisbolus/PycharmProjects/pythonProject/{output_file_name}.xlsx')
+pd.DataFrame(reviews).to_excel(output_file_name)
 
 print(datetime.now() - startTime)

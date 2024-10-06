@@ -331,145 +331,146 @@ def subject_test(paper):
 
 
 # --------------------------
-startTime = datetime.now()
-
-apiKey = apiKeys.pop(0)
-api_keys_test()
-for i in file_list:
-    print("\n\n\n", i[0])
-    data_file = i[0]
-    data_sheet = i[1]
-    output_file_name = (
-        data_file.split("/")[-1].split(".")[0].split("_")[0] + " scopus data.xlsx"
-    )
-
-    df = pd.read_excel(data_file, sheet_name=data_sheet)
-    resident_list = [
-        {"resident name": resident[0], "scopus id": str(int(resident[1]))}
-        for resident in df.values
-        if len(str(resident[1])) > 10
-    ]
-
-    if subject_specific:
-        subjects = list(term_list.keys())
-
-    journals = {}
-    data_list = []
-    summary_list = []
-    for resident in resident_list:
-        print(resident["resident name"], resident["scopus id"])
-        resident["resident current h index"] = author_retrieval_from_scopus_id(
-            resident["scopus id"]
+if __name__ == "__main__":
+    startTime = datetime.now()
+    
+    apiKey = apiKeys.pop(0)
+    api_keys_test()
+    for i in file_list:
+        print("\n\n\n", i[0])
+        data_file = i[0]
+        data_sheet = i[1]
+        output_file_name = (
+            data_file.split("/")[-1].split(".")[0].split("_")[0] + " scopus data.xlsx"
         )
-        (paper_list, resident["total_pubs"], next_start) = scopus_search_author_id(
-            resident["scopus id"]
-        )
-
-        while next_start < resident["total_pubs"]:
-            (new_papers, resident["total_pubs"], next_start) = scopus_search_author_id(
-                resident["scopus id"], next_start
+    
+        df = pd.read_excel(data_file, sheet_name=data_sheet)
+        resident_list = [
+            {"resident name": resident[0], "scopus id": str(int(resident[1]))}
+            for resident in df.values
+            if len(str(resident[1])) > 10
+        ]
+    
+        if subject_specific:
+            subjects = list(term_list.keys())
+    
+        journals = {}
+        data_list = []
+        summary_list = []
+        for resident in resident_list:
+            print(resident["resident name"], resident["scopus id"])
+            resident["resident current h index"] = author_retrieval_from_scopus_id(
+                resident["scopus id"]
             )
-            paper_list = paper_list + new_papers
-
-        for paper in paper_list:
-            if paper["doi"]:
-                paper.update(abstract_retrieval_from_doi(paper["doi"]))
-                if paper["issn"]:
-                    if paper["issn"] in journals.keys():
-                        paper.update(journals[paper["issn"]])
-                    else:
-                        citation_metrics = citation_metrics_from_issn(paper["issn"])
-                        paper.update(citation_metrics)
-                        journals[paper["issn"]] = citation_metrics
-
-            (
-                paper["sr_author_affil"],
-                paper["sr_author_h_index"],
-            ) = author_retrieval_from_uri(paper["senior_author_uri"])
-
+            (paper_list, resident["total_pubs"], next_start) = scopus_search_author_id(
+                resident["scopus id"]
+            )
+    
+            while next_start < resident["total_pubs"]:
+                (new_papers, resident["total_pubs"], next_start) = scopus_search_author_id(
+                    resident["scopus id"], next_start
+                )
+                paper_list = paper_list + new_papers
+    
+            for paper in paper_list:
+                if paper["doi"]:
+                    paper.update(abstract_retrieval_from_doi(paper["doi"]))
+                    if paper["issn"]:
+                        if paper["issn"] in journals.keys():
+                            paper.update(journals[paper["issn"]])
+                        else:
+                            citation_metrics = citation_metrics_from_issn(paper["issn"])
+                            paper.update(citation_metrics)
+                            journals[paper["issn"]] = citation_metrics
+    
+                (
+                    paper["sr_author_affil"],
+                    paper["sr_author_h_index"],
+                ) = author_retrieval_from_uri(paper["senior_author_uri"])
+    
+                if subject_specific:
+                    for subject in subjects:
+                        paper[subject] = subject_test(paper)
+    
+                paper.update(resident)
+    
+                data_list.append(paper)
+    
+            resident["i-10 index"] = len(
+                [paper for paper in paper_list if paper["citations"] >= 10]
+            )
+    
+            sr_author_h_indices = [paper["sr_author_h_index"] for paper in paper_list]
+            unique_sr_author_h_indices = [
+                j[1]
+                for j in set(
+                    [(i["senior_author_uri"], i["sr_author_h_index"]) for i in paper_list]
+                )
+            ]
+            resident["total citations"] = sum([paper["citations"] for paper in paper_list])
+            if pgy:
+                (
+                    resident["pre_residency_h_index"],
+                    resident["pre_residency_citations"],
+                ) = find_backdated_h_index_from_papers(paper_list, pgy)
+            resident["max_h_index"] = max(sr_author_h_indices)
+            resident["weighted_avg_h_index"] = mean(sr_author_h_indices)
+            resident["avg_h_index"] = mean(unique_sr_author_h_indices)
+    
             if subject_specific:
                 for subject in subjects:
-                    paper[subject] = subject_test(paper)
-
-            paper.update(resident)
-
-            data_list.append(paper)
-
-        resident["i-10 index"] = len(
-            [paper for paper in paper_list if paper["citations"] >= 10]
-        )
-
-        sr_author_h_indices = [paper["sr_author_h_index"] for paper in paper_list]
-        unique_sr_author_h_indices = [
-            j[1]
-            for j in set(
-                [(i["senior_author_uri"], i["sr_author_h_index"]) for i in paper_list]
-            )
-        ]
-        resident["total citations"] = sum([paper["citations"] for paper in paper_list])
-        if pgy:
-            (
-                resident["pre_residency_h_index"],
-                resident["pre_residency_citations"],
-            ) = find_backdated_h_index_from_papers(paper_list, pgy)
-        resident["max_h_index"] = max(sr_author_h_indices)
-        resident["weighted_avg_h_index"] = mean(sr_author_h_indices)
-        resident["avg_h_index"] = mean(unique_sr_author_h_indices)
-
-        if subject_specific:
-            for subject in subjects:
-                subject_paper_list = [paper for paper in paper_list if paper[subject]]
-                subject_sr_author_h_indices = [
-                    paper["sr_author_h_index"] for paper in subject_paper_list
-                ]
-                unique_subject_sr_author_h_indices = [
-                    j[1]
-                    for j in set(
-                        [
-                            (i["senior_author_uri"], i["sr_author_h_index"])
-                            for i in paper_list
-                        ]
+                    subject_paper_list = [paper for paper in paper_list if paper[subject]]
+                    subject_sr_author_h_indices = [
+                        paper["sr_author_h_index"] for paper in subject_paper_list
+                    ]
+                    unique_subject_sr_author_h_indices = [
+                        j[1]
+                        for j in set(
+                            [
+                                (i["senior_author_uri"], i["sr_author_h_index"])
+                                for i in paper_list
+                            ]
+                        )
+                    ]
+                    resident[f"total {subject} citations"] = sum(
+                        [paper["citations"] for paper in subject_paper_list]
                     )
-                ]
-                resident[f"total {subject} citations"] = sum(
-                    [paper["citations"] for paper in subject_paper_list]
-                )
-                (
-                    resident[f"{subject}_pre_residency_h_index"],
-                    resident[f"{subject} pre residency citations"],
-                ) = find_backdated_h_index_from_papers(subject_paper_list, pgy)
-                resident[f"{subject}_max_h_index"] = max(subject_sr_author_h_indices)
-                resident[f"{subject}_weighted_avg_h_index"] = mean(
-                    subject_sr_author_h_indices
-                )
-                resident[f"{subject}_avg_h_index"] = mean(
-                    unique_subject_sr_author_h_indices
-                )
-
-        summary_list.append(resident)
-
-    resident_names = set([resident[0] for resident in df.values])
-    attempted_names = set([i["resident name"] for i in resident_list])
-    succeeded_names = set([i["resident name"] for i in summary_list])
-
-    invalid_entries = resident_names - attempted_names
-    failed_entries = attempted_names - succeeded_names
-
-    with pd.ExcelWriter(output_file_name) as writer:
-        pd.DataFrame(data_list).to_excel(writer, sheet_name="data")
-        pd.DataFrame(summary_list).to_excel(writer, sheet_name="summary statistics")
-
-        if invalid_entries:
-            pd.merge(
-                pd.DataFrame(invalid_entries),
-                df,
-                how="left",
-                left_on=0,
-                right_on="Name",
-            ).to_excel(writer, sheet_name="invalid")
-        if failed_entries:
-            pd.merge(
-                pd.DataFrame(failed_entries), df, how="left", left_on=0, right_on="Name"
-            ).to_excel(writer, sheet_name="failed")
-
-    print(datetime.now() - startTime)
+                    (
+                        resident[f"{subject}_pre_residency_h_index"],
+                        resident[f"{subject} pre residency citations"],
+                    ) = find_backdated_h_index_from_papers(subject_paper_list, pgy)
+                    resident[f"{subject}_max_h_index"] = max(subject_sr_author_h_indices)
+                    resident[f"{subject}_weighted_avg_h_index"] = mean(
+                        subject_sr_author_h_indices
+                    )
+                    resident[f"{subject}_avg_h_index"] = mean(
+                        unique_subject_sr_author_h_indices
+                    )
+    
+            summary_list.append(resident)
+    
+        resident_names = set([resident[0] for resident in df.values])
+        attempted_names = set([i["resident name"] for i in resident_list])
+        succeeded_names = set([i["resident name"] for i in summary_list])
+    
+        invalid_entries = resident_names - attempted_names
+        failed_entries = attempted_names - succeeded_names
+    
+        with pd.ExcelWriter(output_file_name) as writer:
+            pd.DataFrame(data_list).to_excel(writer, sheet_name="data")
+            pd.DataFrame(summary_list).to_excel(writer, sheet_name="summary statistics")
+    
+            if invalid_entries:
+                pd.merge(
+                    pd.DataFrame(invalid_entries),
+                    df,
+                    how="left",
+                    left_on=0,
+                    right_on="Name",
+                ).to_excel(writer, sheet_name="invalid")
+            if failed_entries:
+                pd.merge(
+                    pd.DataFrame(failed_entries), df, how="left", left_on=0, right_on="Name"
+                ).to_excel(writer, sheet_name="failed")
+    
+        print(datetime.now() - startTime)

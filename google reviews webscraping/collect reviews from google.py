@@ -57,37 +57,38 @@ def get_one_review_page_from_google_maps(data_id: str, next_page_token:str = Fal
 
 #-----------------------------------------
 
-startTime = datetime.now()
-
-df = df[df.columns[0:4]].values
-reviews = []
-for row in df:
-    temp_reviews = []
-    number, physician = row[0], row[1]
-    print(number, physician)
-
-    data_ids = get_data_ids_from_google_maps(' '.join(row[1:4]))
-    if data_ids:
-        for double in data_ids:
-            data_id, title = double
-            review_page, next_page_token = get_one_review_page_from_google_maps(data_id)
-            if review_page:
-                for review in review_page:
-                    review.update({'data_id': data_id, 'title': title})
-                [temp_reviews.append(review) for review in review_page]
-                while next_page_token:
-                    review_page, next_page_token = get_one_review_page_from_google_maps(data_id, next_page_token)
-                    if review_page:
-                        for review in review_page:
-                            review.update({'data_id': data_id, 'title': title})
-                        [temp_reviews.append(review) for review in review_page]
-
-        for review in temp_reviews:
-            review['number'] = number
-            review['physician'] = physician
-
-        [reviews.append(i) for i in temp_reviews]
-
-pd.DataFrame(reviews).to_excel(output_file_name)
-
-print(datetime.now() - startTime)
+if __name__ == "__main__":
+    startTime = datetime.now()
+    
+    df = df[df.columns[0:4]].values
+    reviews = []
+    for row in df:
+        temp_reviews = []
+        number, physician = row[0], row[1]
+        print(number, physician)
+    
+        data_ids = get_data_ids_from_google_maps(' '.join(row[1:4]))
+        if data_ids:
+            for double in data_ids:
+                data_id, title = double
+                review_page, next_page_token = get_one_review_page_from_google_maps(data_id)
+                if review_page:
+                    for review in review_page:
+                        review.update({'data_id': data_id, 'title': title})
+                    [temp_reviews.append(review) for review in review_page]
+                    while next_page_token:
+                        review_page, next_page_token = get_one_review_page_from_google_maps(data_id, next_page_token)
+                        if review_page:
+                            for review in review_page:
+                                review.update({'data_id': data_id, 'title': title})
+                            [temp_reviews.append(review) for review in review_page]
+    
+            for review in temp_reviews:
+                review['number'] = number
+                review['physician'] = physician
+    
+            [reviews.append(i) for i in temp_reviews]
+    
+    pd.DataFrame(reviews).to_excel(output_file_name)
+    
+    print(datetime.now() - startTime)

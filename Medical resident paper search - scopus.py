@@ -293,9 +293,7 @@ def author_retrieval_from_uri(uri):
         print(response.status_code, "\n", response.text)
 
 
-def find_backdated_h_index_from_papers(
-    paper_list, pgy
-):  # consider adding number of pubs in this period
+def find_backdated_h_index_from_papers(paper_list, pgy):  # consider adding number of pubs in this period
     interview_end_date = latest_cycle - relativedelta(years=pgy)
 
     pre_residency_citation_list = [
